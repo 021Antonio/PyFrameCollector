@@ -1,3 +1,4 @@
+# scr/framecapture/ui.py
 from pathlib import Path
 from typing import Optional
 import tkinter as tk
@@ -6,9 +7,11 @@ from tkinter import filedialog, ttk, messagebox
 from .config import CaptureConfig
 from .pipeline import CapturePipeline
 from .video import enumerate_cameras
-from .tutorial import TutorialViewer  # viewer do tutorial
+from .tutorial import TutorialViewer  # requer Pillow>=10
 
-FIXED_STRIDE = 20  # captura a cada 20 frames
+SAVE_FPS = 5.0                 # salva ~5 frames por segundo (tempo-baseado)
+MAX_RECORD_SECONDS = 5.0       # cada sessão dura no máximo 5s
+PRE_COUNTDOWN_SECONDS = 3.0    # contagem antes da gravação (na mesma janela)
 
 
 class CaptureApp(tk.Tk):
@@ -22,6 +25,9 @@ class CaptureApp(tk.Tk):
         self.cameras = enumerate_cameras(max_devices=10)
         self.pipeline: Optional[CapturePipeline] = None
         self.tutorial = TutorialViewer(self)
+
+        # handler para cancelar o timer do auto-stop
+        self._auto_stop_after_id: Optional[str] = None
 
         self._build_ui()
 
@@ -51,7 +57,7 @@ class CaptureApp(tk.Tk):
             row=0, column=2, columnspan=3, sticky="w", padx=8, pady=6
         )
 
-        # Captura (câmera + preview + info stride fixo)
+        # Captura (câmera + preview + info taxa)
         frm_cap = ttk.LabelFrame(self, text="Captura")
         frm_cap.pack(fill="x", **pad)
 
@@ -71,7 +77,7 @@ class CaptureApp(tk.Tk):
         self.var_preview = tk.BooleanVar(value=True)
         ttk.Checkbutton(frm_cap, text="Mostrar preview", variable=self.var_preview).grid(row=0, column=2, padx=8, pady=6)
 
-        ttk.Label(frm_cap, text=f"Salvando a cada {FIXED_STRIDE} frames").grid(
+        ttk.Label(frm_cap, text=f"Pré-contagem: {int(PRE_COUNTDOWN_SECONDS)}s • Gravação: {int(MAX_RECORD_SECONDS)}s • ~{SAVE_FPS:.0f} FPS").grid(
             row=0, column=3, sticky="w", padx=8, pady=6
         )
 
@@ -79,7 +85,7 @@ class CaptureApp(tk.Tk):
         frm_ctrl = ttk.Frame(self)
         frm_ctrl.pack(fill="x", **pad)
 
-        # Botão de tutorial abre seletor A..Z independente da pasta
+        # Botão de tutorial (seletor A..Z independente da pasta)
         ttk.Button(frm_ctrl, text="Abrir Tutorial", command=self._open_tutorial_picker).pack(side="left", padx=6)
 
         self.btn_start = ttk.Button(frm_ctrl, text="Iniciar Captura", command=self._start_capture)
@@ -115,7 +121,7 @@ class CaptureApp(tk.Tk):
         frame.pack()
 
         letters = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
-        cols = 7  # grade de 7 colunas (7x4 = 28; usaremos 26)
+        cols = 7  # grade 7 colunas
         for idx, letter in enumerate(letters):
             r, c = divmod(idx, cols)
             btn = ttk.Button(frame, text=letter, width=4,
@@ -143,24 +149,44 @@ class CaptureApp(tk.Tk):
 
         cfg = CaptureConfig(
             output_parent=self.parent_dir,
-            output_dir_name=subfolder_letter,   # A..Z (para salvar)
-            frame_stride=FIXED_STRIDE,          # fixo = 20
+            output_dir_name=subfolder_letter,   # A..Z
+            save_fps=SAVE_FPS,                  # 5 FPS
             camera_index=cam_index,
-            preview=self.var_preview.get()
+            preview=self.var_preview.get(),
+            max_duration_seconds=MAX_RECORD_SECONDS
         )
         self.pipeline = CapturePipeline(cfg)
         self.pipeline.start()
 
+        # UI: travar/ativar botões e mensagem
         self.btn_start.config(state="disabled")
         self.btn_stop.config(state="normal")
         self.lbl_status.config(
-            text=f"Capturando em {self.parent_dir / subfolder_letter} (a cada {FIXED_STRIDE} frames)..."
+            text=f"Pré-contagem ({int(PRE_COUNTDOWN_SECONDS)}s) + gravando em {self.parent_dir / subfolder_letter} (~{SAVE_FPS:.0f} FPS, {int(MAX_RECORD_SECONDS)}s)..."
         )
 
+        # Agenda parada automática (UI) para depois da pré-contagem + gravação
+        total_ms = int((PRE_COUNTDOWN_SECONDS + MAX_RECORD_SECONDS) * 1000)
+        self._auto_stop_after_id = self.after(total_ms, self._auto_stop_if_running)
+
+    def _auto_stop_if_running(self):
+        self._auto_stop_after_id = None
+        if self.pipeline:
+            self._stop_capture()
+
     def _stop_capture(self):
+        # Cancela timer pendente (se houver)
+        if self._auto_stop_after_id is not None:
+            try:
+                self.after_cancel(self._auto_stop_after_id)
+            except Exception:
+                pass
+            self._auto_stop_after_id = None
+
         if self.pipeline:
             self.pipeline.stop()
             self.pipeline = None
+
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
         self.lbl_status.config(text="Parado.")

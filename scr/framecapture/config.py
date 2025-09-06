@@ -6,13 +6,13 @@ class CaptureConfig:
     output_parent: Path
     output_dir_name: str               # uma letra A..Z
     filename_prefix: str = "frame"
-    frame_stride: int = 20             # <= FIXO: 20 frames
+    save_fps: float = 5.0              # <- NOVO: salva ~5 imagens por segundo (tempo-baseado)
     camera_index: int = 0
     image_ext: str = "jpg"
     preview: bool = True
+    max_duration_seconds: float = 5.0  # cada sessão dura no máximo 5s
 
     def get_output_dir(self) -> Path:
-        # força letra A..Z
         letter = (self.output_dir_name or "A").strip().upper()
         if len(letter) != 1 or not letter.isalpha():
             letter = "A"
