@@ -8,7 +8,7 @@ from .video import VideoSource
 from .precapture import PreCaptureGuide
 
 
-PRE_COUNTDOWN_SECONDS = 3.0  # contagem antes de iniciar a gravação
+PRE_COUNTDOWN_SECONDS = 5.0  # contagem antes de iniciar a gravação
 
 
 class TimeSampler:

@@ -11,7 +11,7 @@ from .tutorial import TutorialViewer  # requer Pillow>=10
 
 SAVE_FPS = 5.0                 # salva ~5 frames por segundo (tempo-baseado)
 MAX_RECORD_SECONDS = 5.0       # cada sessão dura no máximo 5s
-PRE_COUNTDOWN_SECONDS = 3.0    # contagem antes da gravação (na mesma janela)
+PRE_COUNTDOWN_SECONDS = 5.0    # contagem antes da gravação (na mesma janela)
 
 
 class CaptureApp(tk.Tk):

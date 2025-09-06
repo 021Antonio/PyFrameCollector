@@ -17,12 +17,12 @@ class PreCaptureGuide:
 
     def __init__(
         self,
-        countdown_seconds: float = 3.0,
+        countdown_seconds: float = 5.0,
         circle_color: Tuple[int, int, int] = (0, 255, 0),
         text_color: Tuple[int, int, int] = (255, 255, 255),
         circle_thickness: int = 3,
         radius_frac: float = 0.22,   # raio ≈ 22% do menor lado
-        title: str = "Posicione a mão no círculo (ESC cancela)",
+        title: str = "Posicione a mao no circulo (ESC cancela)",
     ):
         self.countdown_seconds = float(countdown_seconds)
         self.circle_color = circle_color
